@@ -1,7 +1,7 @@
 {
-  "name": "flutter-clean-architecture",
-  "displayName": "Flutter Feature Scaffolding",
-  "description": "Add new feature easily with well structured directories (Clean Architecture pattern)",
+  "name": "clean-architecture-folder-structure",
+  "displayName": "Clean Architecture Folder Structure",
+  "description": "Add new modules easily with well structured directories (Clean Architecture pattern)",
   "version": "1.0.9",
   "publisher": "KiritchoukC",
   "repository": {
@@ -20,27 +20,29 @@
     "dart",
     "flutter",
     "bloc",
+    "mobx",
+    "modular",
     "state-management"
   ],
   "icon": "assets/logo.png",
   "activationEvents": [
-    "onCommand:extension.new-feature",
+    "onCommand:extension.new-module",
     "workspaceContains:**/pubspec.yaml"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "extension.new-feature",
-        "title": "New Feature",
-        "category": "Flutter Clean Architecture",
+        "command": "extension.new-module",
+        "title": "New Module",
+        "category": "Clean Architecture Folder Structure",
         "icon": "assets/logo.png"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "command": "extension.new-feature",
+          "command": "extension.new-module",
           "group": "cleanArchitectureGroup@1",
           "when": "explorerResourceIsFolder"
         }

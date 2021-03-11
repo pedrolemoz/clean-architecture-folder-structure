@@ -19,7 +19,7 @@ import { analyzeDependencies } from "./utils";
 export function activate(_context: ExtensionContext) {
   analyzeDependencies();
 
-  commands.registerCommand("extension.new-feature", async (uri: Uri) => {
+  commands.registerCommand("extension.new-module", async (uri: Uri) => {
     // Show module prompt
     let moduleName = await promptForModuleName();
 
