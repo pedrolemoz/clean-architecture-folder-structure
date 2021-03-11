@@ -8,31 +8,27 @@ import {
   ExtensionContext,
   InputBoxOptions,
   OpenDialogOptions,
-  QuickPickOptions,
   Uri,
   window,
 } from "vscode";
-import { existsSync, lstatSync, writeFile, appendFile } from "fs";
-import {
-  getBlocEventTemplate,
-  getBlocStateTemplate,
-  getBlocTemplate,
-} from "./templates";
+
+import { existsSync, lstatSync } from "fs";
+
 import { analyzeDependencies } from "./utils";
 
 export function activate(_context: ExtensionContext) {
   analyzeDependencies();
 
   commands.registerCommand("extension.new-feature", async (uri: Uri) => {
-    // Show feature prompt
-    let featureName = await promptForFeatureName();
+    // Show module prompt
+    let moduleName = await promptForModuleName();
 
     // Abort if name is not valid
-    if (!isNameValid(featureName)) {
+    if (!isNameValid(moduleName)) {
       window.showErrorMessage("The name must not be empty");
       return;
     }
-    featureName = `${featureName}`;
+    moduleName = `${moduleName}`;
 
     let targetDirectory = "";
     try {
@@ -41,19 +37,17 @@ export function activate(_context: ExtensionContext) {
       window.showErrorMessage(error.message);
     }
 
-    const useEquatable = await promptForUseEquatable();
 
-    const pascalCaseFeatureName = changeCase.pascalCase(
-      featureName.toLowerCase()
+    const pascalCaseModuleName = changeCase.pascalCase(
+      moduleName.toLowerCase()
     );
     try {
-      await generateFeatureArchitecture(
-        `${featureName}`,
+      await generateModuleArchitecture(
+        `${moduleName}`,
         targetDirectory,
-        useEquatable
       );
       window.showInformationMessage(
-        `Successfully Generated ${pascalCaseFeatureName} Feature`
+        `Successfully Generated ${pascalCaseModuleName} Module`
       );
     } catch (error) {
       window.showErrorMessage(
@@ -64,17 +58,17 @@ export function activate(_context: ExtensionContext) {
   });
 }
 
-export function isNameValid(featureName: string | undefined): boolean {
-  // Check if feature name exists
-  if (!featureName) {
+export function isNameValid(moduleName: string | undefined): boolean {
+  // Check if module name exists
+  if (!moduleName) {
     return false;
   }
-  // Check if feature name is null or white space
-  if (_.isNil(featureName) || featureName.trim() === "") {
+  // Check if module name is null or white space
+  if (_.isNil(moduleName) || moduleName.trim() === "") {
     return false;
   }
 
-  // Return true if feature name is valid
+  // Return true if module name is valid
   return true;
 }
 
@@ -95,7 +89,7 @@ export async function getTargetDirectory(uri: Uri): Promise<string> {
 export async function promptForTargetDirectory(): Promise<string | undefined> {
   const options: OpenDialogOptions = {
     canSelectMany: false,
-    openLabel: "Select a folder to create the feature in",
+    openLabel: "Select a folder to create the module in",
     canSelectFolders: true,
   };
 
@@ -107,64 +101,32 @@ export async function promptForTargetDirectory(): Promise<string | undefined> {
   });
 }
 
-export function promptForFeatureName(): Thenable<string | undefined> {
+export function promptForModuleName(): Thenable<string | undefined> {
   const blocNamePromptOptions: InputBoxOptions = {
-    prompt: "Feature Name",
+    prompt: "Module Name",
     placeHolder: "login",
   };
   return window.showInputBox(blocNamePromptOptions);
 }
 
-export async function promptForUseEquatable(): Promise<boolean> {
-  const useEquatablePromptValues: string[] = ["no (default)", "yes (advanced)"];
-  const useEquatablePromptOptions: QuickPickOptions = {
-    placeHolder:
-      "Do you want to use the Equatable Package in bloc to override equality comparisons?",
-    canPickMany: false,
-  };
 
-  const answer = await window.showQuickPick(
-    useEquatablePromptValues,
-    useEquatablePromptOptions
-  );
 
-  return answer === "yes (advanced)";
-}
-
-async function generateBlocCode(
-  blocName: string,
+export async function generateModuleArchitecture(
+  moduleName: string,
   targetDirectory: string,
-  useEquatable: boolean
 ) {
-  const blocDirectoryPath = `${targetDirectory}/bloc`;
-  if (!existsSync(blocDirectoryPath)) {
-    await createDirectory(blocDirectoryPath);
+  // Create the modules directory if its does not exist yet
+  const modulesDirectoryPath = getModulesDirectoryPath(targetDirectory);
+  if (!existsSync(modulesDirectoryPath)) {
+    await createDirectory(modulesDirectoryPath);
   }
 
-  await Promise.all([
-    createBlocEventTemplate(blocName, targetDirectory, useEquatable),
-    createBlocStateTemplate(blocName, targetDirectory, useEquatable),
-    createBlocTemplate(blocName, targetDirectory, useEquatable),
-  ]);
-}
+  // Create the module directory
+  const moduleDirectoryPath = path.join(modulesDirectoryPath, moduleName);
+  await createDirectory(moduleDirectoryPath);
 
-export async function generateFeatureArchitecture(
-  featureName: string,
-  targetDirectory: string,
-  useEquatable: boolean
-) {
-  // Create the features directory if its does not exist yet
-  const featuresDirectoryPath = getFeaturesDirectoryPath(targetDirectory);
-  if (!existsSync(featuresDirectoryPath)) {
-    await createDirectory(featuresDirectoryPath);
-  }
-
-  // Create the feature directory
-  const featureDirectoryPath = path.join(featuresDirectoryPath, featureName);
-  await createDirectory(featureDirectoryPath);
-
-  // Create the data layer
-  const dataDirectoryPath = path.join(featureDirectoryPath, "data");
+  // Create the infrastructure layer
+  const dataDirectoryPath = path.join(moduleDirectoryPath, "infrastructure");
   await createDirectories(dataDirectoryPath, [
     "datasources",
     "models",
@@ -172,7 +134,7 @@ export async function generateFeatureArchitecture(
   ]);
 
   // Create the domain layer
-  const domainDirectoryPath = path.join(featureDirectoryPath, "domain");
+  const domainDirectoryPath = path.join(moduleDirectoryPath, "domain");
   await createDirectories(domainDirectoryPath, [
     "entities",
     "repositories",
@@ -181,20 +143,20 @@ export async function generateFeatureArchitecture(
 
   // Create the presentation layer
   const presentationDirectoryPath = path.join(
-    featureDirectoryPath,
+    moduleDirectoryPath,
     "presentation"
   );
   await createDirectories(presentationDirectoryPath, [
-    "bloc",
+    "controllers",
     "pages",
     "widgets",
   ]);
 
   // Generate the bloc code in the presentation layer
-  await generateBlocCode(featureName, presentationDirectoryPath, useEquatable);
+  // await generateBlocCode(moduleName, presentationDirectoryPath, useEquatable);
 }
 
-export function getFeaturesDirectoryPath(currentDirectory: string): string {
+export function getModulesDirectoryPath(currentDirectory: string): string {
   // Split the path
   const splitPath = currentDirectory.split(path.sep);
 
@@ -206,12 +168,12 @@ export function getFeaturesDirectoryPath(currentDirectory: string): string {
   // Rebuild path
   const result = splitPath.join(path.sep);
 
-  // Determines whether we're already in the features directory or not
-  const isDirectoryAlreadyFeatures =
-    splitPath[splitPath.length - 1] === "features";
+  // Determines whether we're already in the modules directory or not
+  const isDirectoryAlreadyModules =
+    splitPath[splitPath.length - 1] === "modules";
 
-  // If already return the current directory if not, return the current directory with the /features append to it
-  return isDirectoryAlreadyFeatures ? result : path.join(result, "features");
+  // If already return the current directory if not, return the current directory with the /modules append to it
+  return isDirectoryAlreadyModules ? result : path.join(result, "modules");
 }
 
 export async function createDirectories(
@@ -235,83 +197,5 @@ function createDirectory(targetDirectory: string): Promise<void> {
       }
       resolve();
     });
-  });
-}
-
-function createBlocEventTemplate(
-  blocName: string,
-  targetDirectory: string,
-  useEquatable: boolean
-) {
-  const snakeCaseBlocName = changeCase.snakeCase(blocName.toLowerCase());
-  const targetPath = `${targetDirectory}/bloc/${snakeCaseBlocName}_event.dart`;
-  if (existsSync(targetPath)) {
-    throw Error(`${snakeCaseBlocName}_event.dart already exists`);
-  }
-  return new Promise(async (resolve, reject) => {
-    writeFile(
-      targetPath,
-      getBlocEventTemplate(blocName, useEquatable),
-      "utf8",
-      (error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      }
-    );
-  });
-}
-
-function createBlocStateTemplate(
-  blocName: string,
-  targetDirectory: string,
-  useEquatable: boolean
-) {
-  const snakeCaseBlocName = changeCase.snakeCase(blocName.toLowerCase());
-  const targetPath = `${targetDirectory}/bloc/${snakeCaseBlocName}_state.dart`;
-  if (existsSync(targetPath)) {
-    throw Error(`${snakeCaseBlocName}_state.dart already exists`);
-  }
-  return new Promise(async (resolve, reject) => {
-    writeFile(
-      targetPath,
-      getBlocStateTemplate(blocName, useEquatable),
-      "utf8",
-      (error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      }
-    );
-  });
-}
-
-function createBlocTemplate(
-  blocName: string,
-  targetDirectory: string,
-  useEquatable: boolean
-) {
-  const snakeCaseBlocName = changeCase.snakeCase(blocName.toLowerCase());
-  const targetPath = `${targetDirectory}/bloc/${snakeCaseBlocName}_bloc.dart`;
-  if (existsSync(targetPath)) {
-    throw Error(`${snakeCaseBlocName}_bloc.dart already exists`);
-  }
-  return new Promise(async (resolve, reject) => {
-    writeFile(
-      targetPath,
-      getBlocTemplate(blocName, useEquatable),
-      "utf8",
-      (error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      }
-    );
   });
 }
